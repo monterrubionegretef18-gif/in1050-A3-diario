@@ -35,3 +35,8 @@ graph LR
     B -- Estado Normal / Estrés --> D[SmolLM2-1.7B-Instruct]
     D --> E[Salida: Análisis Emocional y Recomendaciones]
 
+
+
+
+
+
