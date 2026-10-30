@@ -40,33 +40,3 @@ graph LR
 
 
 
-## Infraestructura
-
-El cálculo de memoria mínima estimada para cargar el modelo en precisión FP16 es el siguiente:
-
-$$ \text{Memoria} = 1.7 \times 10^9 \text{ parámetros} \times 2 \text{ bytes} \approx 3.4 \text{ GB} $$
-
-**Decisión de Infraestructura:** El modelo se ejecutará en **Google Colab con GPU T4** (15 GB de VRAM de entorno gratuito). Esta plataforma cubre holgadamente los ~3.4 GB requeridos para los pesos y la memoria del KV-cache durante la inferencia, permitiendo un procesamiento local rápido, sin costo y sin saturar memoria de procesamiento.
-
-## Riesgo Ético
-
-* **Riesgo Principal:** Que el modelo genere un diagnóstico erróneo, responda de forma inadecuada o minimice una crisis severa de salud mental (como ideación suicida).
-* **Mitigación:** Implementación de un filtro estricto por reglas de palabras clave (*hardcoded guardrail*) que detecte indicadores de peligro e interrumpa al modelo para mostrar de inmediato números telefónicos de emergencia profesional, acompañado de un aviso explícito aclarando que la aplicación no sustituye a un terapeuta humano.
-
-## Cambios respecto a la Fase 1
-
-* **Aclaración del idioma:** Se integró en la lógica de indicación (*prompting*) una instrucción explícita para asegurar respuestas fluidas y empáticas en español, mitigando la limitación del modelo referente al idioma inglés.
-* **Reforzamiento del Guardrail:** Se definieron listas concretas de palabras clave de alerta prioritaria antes de invocar la inferencia del modelo.
-
-## Siguientes Pasos
-
-- [ ] Crear la interfaz interactiva para el usuario final (usando Gradio / Streamlit en Colab).
-- [ ] Optimizar las plantillas de prompts para afinar el tono empático y la precisión en la identificación de distorsiones cognitivas.
-- [ ] Realizar pruebas de estrés con casos de uso reales y validar la correcta activación del guardrail de seguridad.
-- [ ] Diseñar y presentar el informe final y prototipo ejecutable para el Parcial III.
-
-## Referencias
-
-1. Hugging Face. (2024). *SmolLM2-1.7B-Instruct Model Card*. [https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-Instruct)
-2. Allsopp, K., et al. (2019). *Heterogeneity in psychiatric diagnostic classification*. Psychiatry Research. [https://doi.org/10.1016/j.psychres.2019.07.005](https://doi.org/10.1016/j.psychres.2019.07.005)
-
