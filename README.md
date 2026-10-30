@@ -34,7 +34,7 @@ graph LR
     B -- Detección de Crisis Severa --> C[(Módulo de Emergencia: Líneas de Ayuda)]
     B -- Estado Normal / Estrés --> D[SmolLM2-1.7B-Instruct]
     D --> E[Salida: Análisis Emocional y Recomendaciones]
-
+```
 
 
 
