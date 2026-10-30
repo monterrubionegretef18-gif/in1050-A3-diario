@@ -35,6 +35,11 @@ graph LR
     B -- Estado Normal / Estrés --> D[SmolLM2-1.7B-Instruct]
     D --> E[Salida: Análisis Emocional y Recomendaciones]
 
+
+
+
+
+
 ## Infraestructura
 
 El cálculo de memoria mínima estimada para cargar el modelo en precisión FP16 es el siguiente:
