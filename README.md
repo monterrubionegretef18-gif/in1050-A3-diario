@@ -68,8 +68,10 @@ La falta de acceso inmediato a herramientas de autorreflexión y apoyo emocional
 ## Cómo Funciona
 
 ```mermaid
-graph LR
-    A[Entrada: Texto del Diario] --> B[Filtro Guardrail de Seguridad]
-    B -- Detección de Crisis Severa --> C[(Módulo de Emergencia: Líneas de Ayuda)]
-    B -- Estado Normal / Estrés --> D[SmolLM2-1.7B-Instruct]
-    D --> E[Salida: Análisis Emocional y Recomendaciones]
+flowchart TD
+A([Usuario])-->B[Entrada deL usuario]-->C((SmolLM2-1.7B-Instruct))-->D[Modelo hace su transcripción]-->E{¿Es una situación de riesgo?}
+E--> |Si| F[Conexión con un profesional]
+E--> |No| G[Recomendar al usuario]
+
+```
+
