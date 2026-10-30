@@ -37,7 +37,5 @@ graph LR
 
 
 
-<img width="2048" height="1000" alt="imagen" src="https://github.com/user-attachments/assets/b8fb0d1e-73fd-4c57-bd24-5de0d4d016fa" />
-
 
 
