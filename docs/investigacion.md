@@ -93,4 +93,4 @@ Estudiantes universitarios que experimentan altos niveles de estrés, ansiedad o
 
 
 
-![Diagrama de flujo del Asistente Emocional](img/diagrama-flujo.png)
+![Diagrama de flujo del Asistente Emocional](img/Diagramaflujo.png)
