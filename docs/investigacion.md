@@ -90,3 +90,7 @@ Estudiantes universitarios que experimentan altos niveles de estrés, ansiedad o
 
    [Guía de Recursos de Atención Psicológica Universitaria - Ibero León](https://www.iberoleon.mx/)
 
+
+
+
+![Diagrama de flujo del Asistente Emocional](img/diagrama-flujo.png)
