@@ -14,6 +14,32 @@ SYSTEM_PROMPT = (
     "idioma en que escribió o habló el usuario."
 )
 
+IDIOMAS_AUDIO = {
+    "Auto": None,
+    "Español": "es",
+    "English": "en",
+    "Français": "fr",
+    "Português": "pt",
+}
+
+EJEMPLOS = [
+    [
+        "Hoy tuve muchas entregas y me siento agotada, pero me cuesta desconectarme.",
+        None,
+        "Español",
+    ],
+    [
+        "I feel overwhelmed with tasks today and could use a gentle reflection.",
+        None,
+        "English",
+    ],
+    [
+        "Aujourd'hui j'ai ressenti beaucoup de fatigue et j'ai besoin de souffler.",
+        None,
+        "Français",
+    ],
+]
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 torch_dtype = torch.float16 if device == "cuda" else torch.float32
 
@@ -29,10 +55,14 @@ asr_pipe = pipeline(
 )
 
 
-def transcribir_audio(audio_path):
+def transcribir_audio(audio_path, idioma_seleccionado="Auto"):
     if not audio_path:
         return ""
-    resultado = asr_pipe(audio_path, generate_kwargs={"task": "transcribe"})
+    kwargs = {"task": "transcribe"}
+    codigo_idioma = IDIOMAS_AUDIO.get(idioma_seleccionado)
+    if codigo_idioma:
+        kwargs["language"] = codigo_idioma
+    resultado = asr_pipe(audio_path, generate_kwargs=kwargs)
     if isinstance(resultado, dict):
         return resultado.get("text", "").strip()
     return str(resultado).strip()
@@ -60,9 +90,9 @@ def generar_respuesta(mensaje_usuario):
     return tokenizer.decode(nuevos_tokens, skip_special_tokens=True).strip()
 
 
-def responder_apoyo(texto, audio):
+def responder_apoyo(texto, audio, idioma_audio="Auto"):
     texto_limpio = (texto or "").strip()
-    texto_audio = transcribir_audio(audio)
+    texto_audio = transcribir_audio(audio, idioma_audio)
 
     if texto_limpio and texto_audio:
         entrada_combinada = (
@@ -80,11 +110,22 @@ def responder_apoyo(texto, audio):
 
 demo = gr.Interface(
     fn=responder_apoyo,
+    title="Diario y Apoyo Emocional",
+    description=(
+        "Usa HuggingFaceTB/SmolLM2-1.7B-Instruct y transcripción de voz como "
+        "apoyo reflexivo (sin sustituir atención profesional)."
+    ),
     inputs=[
         gr.Textbox(lines=4, label="Escribe tu entrada de diario"),
         gr.Audio(sources=["microphone", "upload"], type="filepath", label="Audio"),
+        gr.Dropdown(
+            choices=["Auto", "Español", "English", "Français", "Português"],
+            value="Auto",
+            label="Idioma del audio",
+        ),
     ],
     outputs=gr.Textbox(lines=8, label="Respuesta de apoyo"),
+    examples=EJEMPLOS,
 )
 
 if __name__ == "__main__":
