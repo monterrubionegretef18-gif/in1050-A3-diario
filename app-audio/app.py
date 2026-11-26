@@ -7,18 +7,22 @@ MODEL_ID = "HuggingFaceTB/SmolLM2-1.7B-Instruct"
 ASR_MODEL_ID = "openai/whisper-small"
 
 SYSTEM_PROMPT = (
-    "Eres un acompañante empático, cercano y humano para estudiantes universitarios. "
-    "Hablas de forma natural, cálida y fluida en el MISMO IDIOMA del usuario (español, inglés o francés), "
-    "como un buen amigo con formación en bienestar emocional, NUNCA como un robot ni usando listas rígidas.\n\n"
-    "Cómo debes responder:\n"
-    "1. Escucha activa: Muestra preocupación genuina y valida lo que siente con palabras naturales.\n"
-    "2. Reflexión suave: Si notas un pensamiento muy negativo o exagerado (como creer que todo saldrá mal siempre "
-    "o culparse por todo), ayúdale a verlo con más calma sin usar tecnicismos fríos.\n"
-    "3. Si el tema es delicado o problemático (como depresión, ansiedad fuerte, duelos, problemas familiares o abuso), "
-    "exprésale tu preocupación de corazón, dale 2 o 3 recomendaciones concretas de qué puede hacer hoy para cuidarse "
-    "y sugiérele hablar con un psicólogo o con el área de apoyo estudiantil de su universidad.\n"
-    "4. Continuidad: Termina SIEMPRE con una pregunta abierta, suave y natural para seguir conversando y entenderlo mejor.\n"
-    "No des diagnósticos médicos ni uses frases traducidas literalmente del inglés."
+    "Eres un consejero empático de apoyo emocional para estudiantes universitarios. "
+    "Responde SIEMPRE en español natural, claro, breve (máximo 3 o 4 oraciones) y sin errores de traducción.\n"
+    "Tu objetivo en cada respuesta es:\n"
+    "1. Validar con calidez cómo se siente el estudiante.\n"
+    "2. Ayudarle a cuestionar pensamientos exagerados (como creer que todo saldrá mal siempre).\n"
+    "3. Darle un consejo práctico y hacerle una pregunta corta para seguir platicando.\n\n"
+    "Ejemplo 1:\n"
+    "Usuario: Me siento mal porque reprobé una materia en la uni.\n"
+    "Asistente: Lamento mucho que estés pasando por esto, reprobar una materia es muy frustrante pero no define tu capacidad como estudiante. "
+    "A veces sentimos que un tropiezo arruina toda la carrera, pero aún estás a tiempo de recuperarte. "
+    "Te recomiendo revisar en qué temas fallaste y hablar con tu profesor; ¿qué materia fue y cómo te sientes ahora?\n\n"
+    "Ejemplo 2:\n"
+    "Usuario: Llevo días muy estresado y siento que no voy a poder con todo.\n"
+    "Asistente: Es completamente normal sentirte abrumado cuando se juntan muchas entregas. "
+    "En lugar de pensar en todo a la vez, intenta elegir solo una tarea pequeña para terminar hoy y date un respiro. "
+    "Si este agobio lleva mucho tiempo, recuerda que puedes acudir al área de apoyo psicológico de tu universidad. ¿Qué es lo que más te preocupa ahorita?"
 )
 
 # Nivel 3: Hardcoded Guardrail para crisis severa (interrumpe el modelo)
@@ -100,7 +104,6 @@ def transcribir_audio(audio_path, idioma_seleccionado):
 
 
 def generar_respuesta_conversacional(historial_mensajes):
-    # Mantiene el system prompt + los últimos 6 turnos de conversación para no saturar memoria
     mensajes_modelo = [{"role": "system", "content": SYSTEM_PROMPT}] + historial_mensajes[-6:]
 
     prompt = tokenizer.apply_chat_template(
@@ -110,10 +113,10 @@ def generar_respuesta_conversacional(historial_mensajes):
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_new_tokens=260,
-            temperature=0.6,
-            top_p=0.9,
-            repetition_penalty=1.18,
+            max_new_tokens=140,
+            temperature=0.25,
+            top_p=0.85,
+            repetition_penalty=1.15,
             do_sample=True,
             pad_token_id=tokenizer.eos_token_id,
         )
@@ -149,13 +152,11 @@ def conversar(texto, audio, idioma, historial_chat, historial_llm):
     if any(palabra in texto_lower for palabra in PALABRAS_CRISIS):
         respuesta = MENSAJE_EMERGENCIA
     else:
-        # Si detecta un tema problemático, refuerza la instrucción para dar recomendaciones claras
         mensaje_para_llm = entrada_usuario
         if any(palabra in texto_lower for palabra in PALABRAS_DELICADAS):
             mensaje_para_llm += (
-                "\n[Nota interna: El usuario menciona un malestar emocional importante. "
-                "Responde con mucha empatía y preocupación genuina, dale recomendaciones prácticas "
-                "de qué hacer y sugiérele buscar apoyo profesional o universitario, cerrando con una pregunta amable.]"
+                " (Responde con mucha preocupación, dale 2 recomendaciones claras de qué hacer "
+                "y sugiérele acudir con un psicólogo o apoyo universitario, cerrando con una pregunta breve)."
             )
 
         historial_llm.append({"role": "user", "content": mensaje_para_llm})
@@ -171,10 +172,6 @@ def conversar(texto, audio, idioma, historial_chat, historial_llm):
 
 def limpiar_conversacion():
     return [], [], "", "0.00 s", "", None
-
-
-def cargar_ejemplo(texto_ej, idioma_ej):
-    return texto_ej, idioma_ej
 
 
 with gr.Blocks(title="Diario y Apoyo Emocional — Equipo 3") as demo:
