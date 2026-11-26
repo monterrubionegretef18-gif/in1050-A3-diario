@@ -1,3 +1,4 @@
+import time
 import gradio as gr
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
@@ -6,39 +7,52 @@ MODEL_ID = "HuggingFaceTB/SmolLM2-1.7B-Instruct"
 ASR_MODEL_ID = "openai/whisper-small"
 
 SYSTEM_PROMPT = (
-    "Eres un asistente cálido, empático y no invasivo para reflexión de diario "
-    "y apoyo emocional inicial. Valida las emociones de la persona sin juzgar, "
-    "ofrece reflexiones suaves o pasos pequeños y alcanzables, no realices "
-    "diagnósticos médicos ni psicológicos, sugiere buscar apoyo profesional si "
-    "percibes malestar intenso o persistente, y responde SIEMPRE en el mismo "
-    "idioma en que escribió o habló el usuario."
+    "Eres un asistente empático de autorreflexión emocional para estudiantes universitarios. "
+    "Responde SIEMPRE en el MISMO IDIOMA en que escribió o habló el usuario (español, inglés o francés), "
+    "con redacción natural, cálida y sin errores gramaticales.\n"
+    "Organiza tu respuesta exactamente en estas 3 secciones breves:\n"
+    "1. Validación emocional: Reconoce cómo se siente la persona sin juzgar ni dar falsas esperanzas.\n"
+    "2. Distorsión cognitiva detectada: Identifica si hay algún patrón de pensamiento negativo "
+    "(ej. catastrofismo, sobregeneralización, pensamiento todo o nada, lectura de mente) y explícalo en una frase.\n"
+    "3. Paso práctico para hoy: Sugiere una acción pequeña, realista y saludable de autocuidado.\n"
+    "No des diagnósticos médicos y recuerda buscar apoyo profesional si el malestar es intenso."
 )
 
-IDIOMAS_AUDIO = {
-    "Auto": None,
-    "Español": "es",
-    "English": "en",
-    "Français": "fr",
-    "Português": "pt",
-}
-
-EJEMPLOS = [
-    [
-        "Hoy tuve muchas entregas y me siento agotada, pero me cuesta desconectarme.",
-        None,
-        "Español",
-    ],
-    [
-        "I feel overwhelmed with tasks today and could use a gentle reflection.",
-        None,
-        "English",
-    ],
-    [
-        "Aujourd'hui j'ai ressenti beaucoup de fatigue et j'ai besoin de souffler.",
-        None,
-        "Français",
-    ],
+# Hardcoded Guardrail: Palabras clave de crisis severa (Fase 1)
+PALABRAS_CRISIS = [
+    "suicidio",
+    "suicidarme",
+    "matarme",
+    "quitarme la vida",
+    "no quiero vivir",
+    "ya no quiero vivir",
+    "hacerme daño",
+    "cortarme",
+    "morirme",
+    "suicide",
+    "kill myself",
+    "end my life",
+    "don't want to live",
 ]
+
+MENSAJE_EMERGENCIA = (
+    "🚨 ALERTA DE APOYO INMEDIATO 🚨\n\n"
+    "Detectamos que podrías estar pasando por un momento muy difícil o de riesgo. "
+    "No estás solo y tu bienestar es lo más importante. Por favor, comunícate de inmediato "
+    "con un profesional o servicio de emergencia:\n\n"
+    "• Línea de la Vida (México, 24/7 gratuita): 800 911 2000\n"
+    "• Emergencias Nacionales: 911\n"
+    "• SAPTEL (Apoyo psicológico gratuito): 55 5259 8121\n"
+    "• Atención psicológica universitaria: Acude al área de apoyo psicopedagógico de tu campus.\n\n"
+    "Nota: Este sistema es una herramienta automatizada y no sustituye la atención de un profesional de la salud."
+)
+
+MAPA_IDIOMAS = {
+    "Auto": None,
+    "Español": "spanish",
+    "English": "english",
+    "Français": "french",
+}
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 torch_dtype = torch.float16 if device == "cuda" else torch.float32
@@ -55,13 +69,14 @@ asr_pipe = pipeline(
 )
 
 
-def transcribir_audio(audio_path, idioma_seleccionado="Auto"):
+def transcribir_audio(audio_path, idioma_seleccionado):
     if not audio_path:
         return ""
     kwargs = {"task": "transcribe"}
-    codigo_idioma = IDIOMAS_AUDIO.get(idioma_seleccionado)
+    codigo_idioma = MAPA_IDIOMAS.get(idioma_seleccionado)
     if codigo_idioma:
         kwargs["language"] = codigo_idioma
+
     resultado = asr_pipe(audio_path, generate_kwargs=kwargs)
     if isinstance(resultado, dict):
         return resultado.get("text", "").strip()
@@ -80,9 +95,10 @@ def generar_respuesta(mensaje_usuario):
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_new_tokens=220,
-            temperature=0.7,
+            max_new_tokens=230,
+            temperature=0.45,
             top_p=0.9,
+            repetition_penalty=1.15,
             do_sample=True,
             pad_token_id=tokenizer.eos_token_id,
         )
@@ -90,42 +106,90 @@ def generar_respuesta(mensaje_usuario):
     return tokenizer.decode(nuevos_tokens, skip_special_tokens=True).strip()
 
 
-def responder_apoyo(texto, audio, idioma_audio="Auto"):
+def responder_apoyo(texto, audio, idioma):
+    inicio = time.time()
+
     texto_limpio = (texto or "").strip()
-    texto_audio = transcribir_audio(audio, idioma_audio)
+    texto_audio = transcribir_audio(audio, idioma)
 
     if texto_limpio and texto_audio:
         entrada_combinada = (
-            f"Texto escrito:\n{texto_limpio}\n\nAudio transcrito:\n{texto_audio}"
+            f"Texto escrito: {texto_limpio}\nAudio transcrito: {texto_audio}"
         )
     elif texto_limpio:
         entrada_combinada = texto_limpio
     elif texto_audio:
         entrada_combinada = texto_audio
     else:
-        return "Escribe un mensaje o graba/sube un audio para comenzar a reflexionar."
+        tiempo_total = f"{time.time() - inicio:.2f} s"
+        return (
+            "",
+            "Escribe un mensaje o graba/sube un audio para comenzar a reflexionar.",
+            tiempo_total,
+        )
 
-    return generar_respuesta(entrada_combinada)
+    # Hardcoded Guardrail: interrumpe el modelo si detecta palabras de crisis
+    if any(palabra in entrada_combinada.lower() for palabra in PALABRAS_CRISIS):
+        tiempo_total = f"{time.time() - inicio:.2f} s"
+        return entrada_combinada, MENSAJE_EMERGENCIA, tiempo_total
 
+    respuesta = generar_respuesta(entrada_combinada)
+    tiempo_total = f"{time.time() - inicio:.2f} s"
+    return entrada_combinada, respuesta, tiempo_total
+
+
+ejemplos = [
+    [
+        "Siento que por más que estudio y me desvelo para los exámenes, no importa lo que haga, siempre voy a reprobar todo. Ya ni vale la pena seguir intentándolo.",
+        None,
+        "Español",
+    ],
+    [
+        "I feel overwhelmed with tasks today and could use a gentle reflection to organize my mind.",
+        None,
+        "English",
+    ],
+    [
+        "Aujourd'hui j'ai ressenti beaucoup de fatigue et j'ai besoin d'un moment de calme.",
+        None,
+        "Français",
+    ],
+    [
+        "Ya no aguanto la presión, siento que no quiero vivir más.",
+        None,
+        "Español",
+    ],
+]
 
 demo = gr.Interface(
     fn=responder_apoyo,
-    title="Diario y Apoyo Emocional",
-    description=(
-        "Usa HuggingFaceTB/SmolLM2-1.7B-Instruct y transcripción de voz como "
-        "apoyo reflexivo (sin sustituir atención profesional)."
-    ),
     inputs=[
-        gr.Textbox(lines=4, label="Escribe tu entrada de diario"),
+        gr.Textbox(
+            lines=4,
+            placeholder="Escribe aquí cómo te sientes hoy...",
+            label="Escribe tu entrada de diario",
+        ),
         gr.Audio(sources=["microphone", "upload"], type="filepath", label="Audio"),
         gr.Dropdown(
-            choices=["Auto", "Español", "English", "Français", "Português"],
+            choices=["Auto", "Español", "English", "Français"],
             value="Auto",
+            allow_custom_value=False,
             label="Idioma del audio",
         ),
     ],
-    outputs=gr.Textbox(lines=8, label="Respuesta de apoyo"),
-    examples=EJEMPLOS,
+    outputs=[
+        gr.Textbox(lines=2, label="Entrada procesada / Transcripción"),
+        gr.Textbox(lines=9, label="Análisis emocional y distorsiones cognitivas"),
+        gr.Textbox(label="Tiempo de respuesta"),
+    ],
+    title="Diario y Apoyo Emocional — Equipo 3 (Ibero León)",
+    description=(
+        "Herramienta impulsada por **HuggingFaceTB/SmolLM2-1.7B-Instruct** y **openai/whisper-small** "
+        "para autorreflexión emocional e identificación de distorsiones cognitivas.\n\n"
+        "⚠️ **Aviso ético:** Este sistema es únicamente una herramienta de apoyo reflexivo; "
+        "**no** realiza diagnósticos médicos ni sustituye la atención de un profesional de la salud."
+    ),
+    examples=ejemplos,
 )
 
 if __name__ == "__main__":
